@@ -1,0 +1,265 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+    <title>Coventry Middle School Chatroom</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script language="JavaScript" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+    <script src="https://comet-server.com/CometServerApi.js" type="text/javascript"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #121212;
+            color: #e0e0e0;
+        }
+
+        .chat-container {
+            background-color: #000000;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            border-radius: 0;
+            box-shadow: none;
+            align-self: flex-start;
+        }
+
+        .chat-header {
+            background-color: #333;
+            padding: 20px;
+            text-align: center;
+            font-size: 2em;
+            font-weight: bold;
+            color: white;
+        }
+
+        .chat-body {
+            flex: 1;
+            padding: 10px 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+            scroll-behavior: smooth;
+        }
+
+        .chat-footer {
+            display: flex;
+            padding: 20px;
+            background-color: #333;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        #messageInput {
+            width: 80%;
+            padding: 12px;
+            border-radius: 4px;
+            border: 1px solid #555;
+            background-color: #333;
+            color: #ffffff;
+            font-size: 1.2em;
+        }
+
+        button {
+            width: 15%;
+            padding: 12px;
+            margin-left: 10px;
+            background-color: #0062ff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+
+        button:hover {
+            background-color: #004bbd;
+        }
+
+        .message {
+            max-width: 75%;
+            padding: 6px 12px;
+            border-radius: 10px;
+            display: inline-block;
+            word-wrap: break-word;
+            background-color: #b8b8b8;
+            color: #000000;
+            position: relative;
+            font-weight: bold;
+            margin-bottom: 1px;
+        }
+
+        .message.left {
+            background-color: #b8b8b8;
+            align-self: flex-start;
+            border-bottom-left-radius: 0;
+        }
+
+        .message.right {
+            background-color: #0062ff;
+            align-self: flex-end;
+            border-bottom-right-radius: 0;
+        }
+
+        .chat-body::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .chat-body::-webkit-scrollbar-thumb {
+            background-color: #989898de;
+            border-radius: 10px;
+            transition: background-color 0.3s ease;
+        }
+
+        .chat-body::-webkit-scrollbar-thumb:hover {
+            background-color: #444;
+        }
+
+        .chat-body::-webkit-scrollbar-track {
+            background-color: #2a2a2a;
+            border-radius: 10px;
+        }
+
+        .message-image {
+            max-width: 100%;
+            max-height: 300px;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            Coventry Middle School Chatroom
+        </div>
+        <div id="web_chat" class="chat-body"></div>
+        <div class="chat-footer">
+            <textarea id="text" placeholder="Type your message..." style="width: 80%; padding: 12px; border-radius: 4px; border: 1px solid #555; background-color: #333; color: #fff;"></textarea>
+            <button onclick="send();">Send</button>
+        </div>
+    </div>
+
+    <script type="text/javascript">
+        let username = prompt("Enter your username:");
+
+        // List of banned users (you can add/remove users as needed)
+        const bannedUsers = ["bannedUser1", "bannedUser2", "bannedUser3"]; // Example
+
+        $(document).ready(function() {
+            cometApi.start({ node: "app.comet-server.ru", dev_id: 15 });
+
+            cometApi.subscription("simplechat.newMessage", function(event) {
+                const messageData = event.data;
+                const senderName = messageData.name;
+
+                // If the sender is banned, don't display their message
+                if (bannedUsers.includes(senderName.toLowerCase())) {
+                    console.log(`Message from ${senderName} is blocked because they are banned.`);
+                    return; // Stop execution and do not display this message
+                }
+
+                const isCurrentUser = senderName === username;
+                const messageClass = isCurrentUser ? "message right" : "message left";
+
+                const timestamp = getTimestamp(); // Get current timestamp
+
+                $("#web_chat").append(
+                    `<div class="${messageClass}">` +
+                    `<span class="name">${HtmlEncode(senderName)}</span>` +
+                    `<div class="text">${HtmlEncode(messageData.text)}</div>` +
+                    `<div class="timestamp">${timestamp}</div>` + // Display timestamp
+                    `</div>`
+                );
+
+                // Save message to localStorage
+                saveMessage(senderName, messageData.text, timestamp);
+            });
+
+            // Load saved messages from localStorage
+            loadMessages();
+        });
+
+        function HtmlEncode(s) {
+            var el = document.createElement("div");
+            el.innerText = el.textContent = s;
+            s = el.innerHTML;
+            return s;
+        }
+
+        function send() {
+            var text = $('#text').val();
+            if (!text) {
+                alert("Please enter a message.");
+                return;
+            }
+
+            // Check if the user is banned before sending the message
+            if (bannedUsers.includes(username.toLowerCase())) {
+                alert("You are banned and cannot send messages.");
+                return;
+            }
+
+            $.ajax({
+                url: "https://comet-server.com/doc/CppComet/chat-example/chat.php",
+                type: "POST", 
+                data: "text=" + encodeURIComponent(text) + "&name=" + encodeURIComponent(username)
+            });
+
+            $('#text').val(''); // Clear the textarea after sending
+        }
+
+        // Add event listener for Enter key press to send message
+        $('#text').on('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault(); // Prevent new line
+                send(); // Call send function when Enter is pressed
+            }
+        });
+
+        // Function to get the current timestamp
+        function getTimestamp() {
+            const now = new Date();
+            const day = ("0" + now.getDate()).slice(-2);
+            const month = ("0" + (now.getMonth() + 1)).slice(-2); // months are zero-indexed
+            const year = now.getFullYear();
+            const hours = ("0" + now.getHours()).slice(-2);
+            const minutes = ("0" + now.getMinutes()).slice(-2);
+            const ampm = hours >= 12 ? "PM" : "AM";
+
+            const time = `${month}/${day}/${year} ${hours}:${minutes} ${ampm}`;
+            return time;
+        }
+
+        // Function to save message to localStorage
+        function saveMessage(name, text, timestamp) {
+            let messages = JSON.parse(localStorage.getItem('messages')) || [];
+            messages.push({ name, text, timestamp });
+            localStorage.setItem('messages', JSON.stringify(messages));
+        }
+
+        // Function to load saved messages from localStorage
+        function loadMessages() {
+            const messages = JSON.parse(localStorage.getItem('messages')) || [];
+            messages.forEach(message => {
+                const isCurrentUser = message.name === username;
+                const messageClass = isCurrentUser ? "message right" : "message left";
+                $("#web_chat").append(
+                    `<div class="${messageClass}">` +
+                    `<span class="name">${HtmlEncode(message.name)}</span>` +
+                    `<div class="text">${HtmlEncode(message.text)}</div>` +
+                    `<div class="timestamp">${message.timestamp}</div>` + // Display timestamp
+                    `</div>`
+                );
+            });
+        }
+    </script>
+</body>
+</html>
